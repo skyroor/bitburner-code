@@ -8,6 +8,10 @@ export async function upgradeStats(
 	highestCores: number
 ): Promise<void> {
 	for (let n = 0; n < numNodes; ++n) {
+		// TODO TODO TODO TODO TODO 
+		// TODO Mock formula - buy 50 levels - 1 ram upgrade till both max - then cores TODO
+		// TODO Stop buying servers once prices hits X soft/hard limit TODO
+		// TODO TODO TODO TODO TODO 
 		const stats = ns.hacknet.getNodeStats(n)
 
 		if (stats.level < highestLevel) {
@@ -56,7 +60,7 @@ export async function main(ns: NS): Promise<void> {
 	while (running) {
 		let currentMoney = ns.getServerMoneyAvailable('home')
 		let newNodeCost = ns.hacknet.getPurchaseNodeCost()
-		while (newNodeCost <= currentMoney * 0.5) {
+		while (newNodeCost <= currentMoney * 0.1) {
 			ns.hacknet.purchaseNode()
 			currentMoney = ns.getServerMoneyAvailable('home')
 			newNodeCost = ns.hacknet.getPurchaseNodeCost()

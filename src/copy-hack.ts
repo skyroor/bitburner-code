@@ -1,14 +1,15 @@
 import { NS } from '@ns'
 import { getOptimalServer } from 'find-optimal-server.js'
+import { crawlNetwork } from 'crawl-network.js'
 
 export async function deploy(
 	ns: NS,
 	script: string,
 	map: Record<string, string>,
-	accessibleServers: Record<string, number>,
+	hostServers: Record<string, number>,
 	targetServer: string
 ): Promise<boolean> {
-	const total = Object.keys(accessibleServers).length
+	const total = Object.keys(hostServers).length
 	let successCount = 0
 
 	const renderProgressBar = (
@@ -22,11 +23,17 @@ export async function deploy(
 	}
 
 	let progress = ''
-	for (const [server, threads] of Object.entries(accessibleServers)) {
+	for (const [server, threads] of Object.entries(hostServers)) {
 		ns.killall(server)
 		ns.scp(script, server)
 
-		const pid = ns.exec(script, server, threads, targetServer)
+		let pid: number
+		if (script === 'share-ram.js') {
+			pid = ns.exec(script, server, threads)
+		} else {
+			pid = ns.exec(script, server, threads, targetServer)
+		}
+
 
 		if (pid !== 0) {
 			successCount++
@@ -44,7 +51,7 @@ export async function deploy(
 		await ns.sleep(50)
 	}
 
-	ns.tprint('🚀 Deployment finished.')
+	ns.tprint(`🚀 Deployment finished. Deployed servers now targeting ${targetServer} with ☠️${script}☠️`)
 	return true
 }
 
@@ -109,33 +116,6 @@ export async function printNetworkTree(
 	}
 }
 
-export async function crawlNetwork(ns: NS): Promise<Record<string, string>> {
-	const queue = ['home']
-
-	const visited = new Set()
-	visited.add('home')
-
-	const parents: Record<string, string> = {}
-
-	while (queue.length !== 0) {
-		const current = queue.shift()
-		if (current === undefined) {
-			return {}
-		}
-		const neighbors: Array<string> = ns.scan(current)
-
-		for (const neighbor of neighbors) {
-			if (!visited.has(neighbor)) {
-				visited.add(neighbor)
-				parents[neighbor] = current
-				queue.push(neighbor)
-			}
-		}
-	}
-
-	return parents
-}
-
 export async function openPorts(
 	ns: NS,
 	map: Record<string, string>,
@@ -160,9 +140,13 @@ export async function openPorts(
 
 		const ramCost = ns.getScriptRam(script) 
 		const ramAmount = ns.getServerMaxRam(server)
+		let threads = Math.floor(ramAmount/ramCost)
+		if (script === 'share-ram.js') {
+			threads = Math.ceil(threads/4)
+		}
 
 		if ((ramAmount > 0 && portsRequired <= portsAccessible) || server.startsWith('pserv')) {
-			accessibleServers[server] = Math.floor(ramAmount/ramCost)
+			accessibleServers[server] = threads
 		}
 
 		if (portsRequired > 0 && portsRequired <= portsAccessible) {
@@ -185,7 +169,7 @@ export async function openPorts(
 						break
 					}
 					case 'SQLInject.exe': {
-						ns.httpworm(server)
+						ns.sqlinject(server)
 						break
 					}
 				}
@@ -209,11 +193,14 @@ export async function main(ns: NS): Promise<void> {
 	const hackScript = 'ez-hack.js'
 	const shareScript = 'share-ram.js'
 	const argServer = ns.args[0] || ''
-	const optimalServer = await getOptimalServer(ns, argServer.toString())
 
 	const map = await crawlNetwork(ns)
-	const accessibleServers = await openPorts(ns, map, hackScript)
-	await deploy(ns, hackScript, map, accessibleServers, optimalServer)
+
+	const uploadScript = argServer === 'share' ? shareScript : hackScript
+
+	const accessibleServers = await openPorts(ns, map, uploadScript)
+	const optimalServer = await getOptimalServer(ns, argServer.toString())
+	await deploy(ns, uploadScript, map, accessibleServers, optimalServer)
 
 	// await printNetworkTree(ns, map)
 	// ns.print(hackScript, shareScript, optimalServer)

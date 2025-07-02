@@ -1,18 +1,19 @@
 import { NS } from "@ns";
+import { crawlNetwork } from 'crawl-network.js'
 
 export async function getOptimalServer(ns: NS, forceServer = ''): Promise<string> {
-	const servers: Array<string> = ns.scan()
+	const servers: Record<string, string> = await crawlNetwork(ns)
 	const hackingLevel: number = ns.getHackingLevel()
 	let optimalServ = ''
 	let max = 0
-	for (let i = 0; i < servers.length; ++i) {
-		const serv = servers[i]
-		const servMax = ns.getServerMaxMoney(serv)
-		if (ns.getServerRequiredHackingLevel(serv) >= hackingLevel / 2) {
+	for (const [server, _] of Object.entries(servers)) {
+		const servMax = ns.getServerMaxMoney(server)
+		if (ns.getServerRequiredHackingLevel(server) >= hackingLevel / 2) {
 			break
 		}
-		optimalServ = servMax > max ? serv : optimalServ
+		optimalServ = servMax > max ? server : optimalServ
 		max = servMax > max ? servMax : max
 	}
+
 	return forceServer === '' ? (optimalServ || "n00dles") : forceServer
 }

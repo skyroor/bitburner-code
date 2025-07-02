@@ -1,10 +1,13 @@
 import { NS } from '@ns'
 
 export async function main(ns: NS): Promise<void> {
+	await ns.sleep(500)
+
 	// Defines the "target server", which is the server
 	const running = true
 	const optimalServer: string = ns.args[0].toString()
 	const target: string = optimalServer
+	const isHome: boolean = ns.args[1] !== undefined ? true : false
 
 	let moneyThresh: number = ns.getServerMaxMoney(target)
 	let securityThresh: number = ns.getServerMinSecurityLevel(target)
@@ -19,18 +22,30 @@ export async function main(ns: NS): Promise<void> {
 	// Get root access to target server
 	ns.nuke(target)
 
+	function updateTerminal(target: string, att: string, money: number, sec: number) {
+		if (isHome) {
+			const strMoney = money.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+			const maxMoney = ns.getServerMaxMoney(target).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+			ns.tprint(`---- ${target} [${att}][$${strMoney}/${maxMoney}][SEC:${sec}] ----`)
+		}
+	}
+
 	while (running) {
-		if (ns.getServerSecurityLevel(target) > securityThresh) {
-			// If the server's security level is above our threshold, weaken it
-			ns.print("---- WEAKEN ----")
+		const secLevel = Math.floor(ns.getServerSecurityLevel(target))
+		const moneyAvailable = Math.floor(ns.getServerMoneyAvailable(target))
+		let currentAttack = ''
+
+		if (secLevel > securityThresh) {
+			currentAttack = 'WEAKEN'
+			updateTerminal(target, currentAttack, moneyAvailable, secLevel)
 			await ns.weaken(target)
-		} else if (ns.getServerMoneyAvailable(target) < moneyThresh) {
-			// If the server's money is less than our threshold, grow it
-			ns.print("---- GROW ----")
+		} else if (moneyAvailable < moneyThresh) {
+			currentAttack = 'GROW'
+			updateTerminal(target, currentAttack, moneyAvailable, secLevel)
 			await ns.grow(target)
 		} else {
-			// Otherwise, hack it
-			ns.print("---- HACKING ----")
+			currentAttack = 'HACK'
+			updateTerminal(target, currentAttack, moneyAvailable, secLevel)
 			await ns.hack(target)
 		}
 	}

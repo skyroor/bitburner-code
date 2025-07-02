@@ -5,7 +5,7 @@ export async function main(ns: NS): Promise<void> {
 	const hackScript = "ez-hack.js"
 	const serv = "home"
 
-	ns.killall(serv)
+	ns.kill(hackScript)
 
 	const argServer = ns.args[0] || ''
 	const optimalServer = await getOptimalServer(ns, argServer.toString())
@@ -16,8 +16,8 @@ export async function main(ns: NS): Promise<void> {
 	const serverUsedRam = ns.getServerUsedRam(serv)
 	const threads = Math.floor((serverMaxRam - serverUsedRam) / ramPerThread)
 
-	// ns.exec("purchase-server-8gb.js", serv)
-	const pid = ns.exec(hackScript, serv, threads, optimalServer)
+	const isHome = true
+	const pid = ns.exec(hackScript, serv, threads, optimalServer, isHome)
 	if (pid === 0) {
 		ns.tprint(`❌ Failed to start ${hackScript} on ${serv}`)
 	} else {

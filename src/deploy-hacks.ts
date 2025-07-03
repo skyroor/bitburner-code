@@ -34,7 +34,6 @@ export async function deploy(
 			pid = ns.exec(script, server, threads, targetServer)
 		}
 
-
 		if (pid !== 0) {
 			successCount++
 
@@ -48,10 +47,96 @@ export async function deploy(
 			ns.tprint(progress)
 		}
 
-		await ns.sleep(50)
+		await ns.asleep(50)
 	}
 
-	ns.tprint(`🚀 Deployment finished. Deployed servers now targeting ${targetServer} with ☠️${script}☠️`)
+	ns.tprint(
+		`🚀 Deployment finished. Deployed servers now targeting ${targetServer} with ☠️${script}☠️`
+	)
+	return true
+}
+
+export async function advancedDeploy(
+	ns: NS,
+	scripts: Record<string, number>,
+	hostServers: Record<string, number>,
+	targetServer: string
+): Promise<boolean> {
+	const total = Object.keys(hostServers).length
+	const keys = Object.keys(scripts)
+	const values = Object.values(scripts)
+
+	const renderProgressBar = (
+		completed: number,
+		total: number,
+		width = 30
+	): string => {
+		const filledLength = Math.round((completed / total) * width)
+		const bar = '█'.repeat(filledLength) + '-'.repeat(width - filledLength)
+		return `[${bar}] ${completed}/${total} (${((completed / total) * 100).toFixed(2)}%)`
+	}
+
+	const maxScriptRam = Math.max(
+		...keys.map(script => ns.getScriptRam(script))
+	)
+
+	const ratios: Record<string, number> = {}
+	const partsSum = values.reduce((sum, val) => sum + val, 0)
+	for (const [key, parts] of Object.entries(scripts)) {
+		ratios[key] = parts / partsSum
+	}
+
+	for (const [server, maxServerRam] of Object.entries(hostServers)) {
+		let successCount = 0
+		let progress = ''
+		let pid: number
+		let success = false
+		let noFailures = true
+
+		let threads = 1
+		const maxThreads = maxServerRam / maxScriptRam 
+
+		for (const script of keys) {
+			ns.scriptKill(script, server)
+		}
+
+		for (const [script, ratio] of Object.entries(ratios)) {
+			threads = Math.floor(maxThreads * ratio) || 1
+
+			if (script === keys.at(-1)) {
+				threads = Math.floor((maxServerRam - ns.getServerUsedRam(server)) / ns.getScriptRam(script)) || 1
+			}
+
+			ns.scp(script, server)
+
+			pid = ns.exec(script, server, threads, targetServer)
+			if ((pid !== 0) && noFailures) {
+				success = true
+			} else {
+				success = false
+				noFailures = false
+			}
+
+			ns.tprint(`${progress} --- ${threads} of ${script}`)
+			await ns.asleep(100)
+		}
+
+		if (success) {
+			successCount++
+			progress = renderProgressBar(successCount, total)
+			ns.ui.clearTerminal()
+			ns.tprint(`✅ Deployed to ${server} with ${threads} threads`)
+		} else {
+			ns.ui.clearTerminal()
+			ns.tprint(`❌ Deployment to ${server} failed!`)
+		}
+
+		await ns.asleep(100)
+	}
+
+	ns.tprint(
+		`🚀 Deployment finished. Deployed servers now targeting ${targetServer}`
+	)
 	return true
 }
 
@@ -121,7 +206,20 @@ export async function openPorts(
 	map: Record<string, string>,
 	script: string
 ): Promise<Record<string, number>> {
-	const programs = [
+	let portsAccessible = 0
+
+	let hasTor = ns.hasTorRouter()
+	while (!hasTor) {
+		// hasTor = ns.singularity.purchaseTor()
+		hasTor = ns.hasTorRouter()
+		if (!hasTor) {
+			ns.alert('Cannot afford Tor Router -- Will re-attempt purchase.')
+			await ns.asleep(5000)
+		}
+	}
+
+	// const programs = ns.singularity.getDarkwebPrograms()
+	const portPrograms = [
 		'BruteSSH.exe',
 		'FTPCrack.exe',
 		'relaySMTP.exe',
@@ -129,29 +227,45 @@ export async function openPorts(
 		'SQLInject.exe',
 	]
 
-	let portsAccessible = 0
-	for (let i = 0; i < programs.length; ++i) {
-		if (ns.fileExists(programs[i])) portsAccessible++
+	const programs = [
+		'ServerProfiler.exe',
+		'DeepscanV1.exe',
+		'DeepscanV2.exe',
+		'AutoLink.exe',
+		'Formulas.exe',
+	]
+
+	for (const program of portPrograms) {
+		if (!ns.fileExists(program)) {
+			// if (ns.singularity.getDarkwebProgramCost(program) < ns.getServerMoneyAvailable('home')*0.1) {
+			//	ns.singularity.purchaseProgram(program)
+			// }
+		} else {
+			portsAccessible++
+		}
 	}
 
 	const accessibleServers: Record<string, number> = {}
 	for (const [server, _] of Object.entries(map)) {
 		const portsRequired = ns.getServerNumPortsRequired(server)
 
-		const ramCost = ns.getScriptRam(script) 
+		const ramCost = ns.getScriptRam(script)
 		const ramAmount = ns.getServerMaxRam(server)
-		let threads = Math.floor(ramAmount/ramCost)
+		let threads = Math.floor(ramAmount / ramCost)
 		if (script === 'share-ram.js') {
-			threads = Math.ceil(threads/4)
+			threads = Math.ceil(threads / 4)
 		}
 
-		if ((ramAmount > 0 && portsRequired <= portsAccessible) || server.startsWith('pserv')) {
-			accessibleServers[server] = threads
+		if (
+			(ramAmount > 0 && portsRequired <= portsAccessible) ||
+			server.startsWith('pserv')
+		) {
+			accessibleServers[server] = ramAmount
 		}
 
 		if (portsRequired > 0 && portsRequired <= portsAccessible) {
 			for (let i = 0; i < portsRequired; ++i) {
-				switch (programs[i]) {
+				switch (portPrograms[i]) {
 					case 'BruteSSH.exe': {
 						ns.brutessh(server)
 						break
@@ -178,6 +292,7 @@ export async function openPorts(
 
 		if (portsRequired <= portsAccessible) {
 			if (!ns.hasRootAccess(server) && server !== 'home') {
+				ns.tprint(server)
 				if (!ns.nuke(server)) {
 					ns.tprint(`Nuke failed to run on ${server}`)
 				}
@@ -197,10 +312,12 @@ export async function main(ns: NS): Promise<void> {
 	const map = await crawlNetwork(ns)
 
 	const uploadScript = argServer === 'share' ? shareScript : hackScript
+	const uploadScripts = { 'weaken.js': 10, 'grow.js': 20, 'hack.js': 1}
 
 	const accessibleServers = await openPorts(ns, map, uploadScript)
 	const optimalServer = await getOptimalServer(ns, argServer.toString())
-	await deploy(ns, uploadScript, map, accessibleServers, optimalServer)
+	// await deploy(ns, uploadScript, map, accessibleServers, optimalServer)
+	await advancedDeploy(ns, uploadScripts, accessibleServers, optimalServer)
 
 	// await printNetworkTree(ns, map)
 	// ns.print(hackScript, shareScript, optimalServer)

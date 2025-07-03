@@ -14,44 +14,43 @@ export async function upgradeStats(
 		// TODO TODO TODO TODO TODO 
 		const stats = ns.hacknet.getNodeStats(n)
 
-		if (stats.level < highestLevel) {
-			let upgraded = false
-			while (!upgraded) {
-				upgraded = ns.hacknet.upgradeLevel(
-					n,
-					highestLevel - stats.level
-				)
-				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
-			}
-
-			ns.tprint(`Node[${n}] --- Level upgraded to ${highestLevel}`)
-		}
-
-		if (stats.ram < highestRAM) {
-			let upgraded = false
-			while (!upgraded) {
-				upgraded = ns.hacknet.upgradeRam(
-					n,
-					Math.log2(highestRAM - stats.ram)
-				)
-				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
-			}
-
-			ns.tprint(`Node[${n}] --- RAM upgraded to ${highestRAM}`)
-		}
-
-		if (stats.cores < highestCores) {
-			let upgraded = false
-			while (!upgraded) {
-				upgraded = ns.hacknet.upgradeCore(n, highestCores - stats.cores)
-				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
-			}
-
-			ns.tprint(`Node[${n}] --- Cores upgraded to ${highestCores}`)
-		}
-	}
-
-	return
+		return
+// 		if (stats.level < highestLevel) {
+// 			let upgraded = false
+// 			while (!upgraded) {
+// 				upgraded = ns.hacknet.upgradeLevel(
+// 					n,
+// 					highestLevel - stats.level
+// 				)
+// 				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
+// 			}
+// 
+// 			ns.tprint(`Node[${n}] --- Level upgraded to ${highestLevel}`)
+// 		}
+// 
+// 		if (stats.ram < highestRAM) {
+// 			let upgraded = false
+// 			while (!upgraded) {
+// 				upgraded = ns.hacknet.upgradeRam(
+// 					n,
+// 					Math.log2(highestRAM - stats.ram)
+// 				)
+// 				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
+// 			}
+// 
+// 			ns.tprint(`Node[${n}] --- RAM upgraded to ${highestRAM}`)
+// 		}
+// 
+// 		if (stats.cores < highestCores) {
+// 			let upgraded = false
+// 			while (!upgraded) {
+// 				upgraded = ns.hacknet.upgradeCore(n, highestCores - stats.cores)
+// 				if (!upgraded) await ns.sleep(1000) // Wait for 1 second before trying again if not upgraded
+// 			}
+// 
+// 			ns.tprint(`Node[${n}] --- Cores upgraded to ${highestCores}`)
+// 		}
+// 	}
 }
 
 export async function main(ns: NS): Promise<void> {
@@ -98,6 +97,6 @@ export async function main(ns: NS): Promise<void> {
 			}
 		}
 
-		await ns.sleep(5000)
+		await ns.asleep(5000)
 	}
 }
